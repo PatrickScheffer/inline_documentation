@@ -1,0 +1,10 @@
+name = Inline documentation
+description = Create and manage inline documentation.
+package = Inline documentation
+core = 7.x
+
+; Module dependencies.
+dependencies[] = entity
+
+; Autoload support the entity controllers.
+files[] = inline_documentation.module

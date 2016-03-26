@@ -1,0 +1,1164 @@
+<?php
+/**
+ * @file
+ * Defines the inline documentation functions and entity types.
+ */
+
+/*
+ * Hook implementations.
+ */
+
+/**
+ * Implements hook_entity_info().
+ */
+function inline_documentation_entity_info() {
+  $entities = array();
+  // Declare the 'inline_documentation_item' entity.
+  $entities['inline_documentation_item'] = array(
+    'label' => t('Inline documentation item'),
+    'controller class' => 'inlineDocumentationItemController',
+    'base table' => 'inline_documentation_item_data',
+    'fieldable' => FALSE,
+    'entity keys' => array(
+      'id' => 'iid',
+      'bundle' => 'inline_documentation_machine_name',
+      'label' => 'name',
+    ),
+    'bundle keys' => array(
+      'bundle' => 'machine_name',
+    ),
+    'bundles' => array(),
+    'view modes' => array(
+      'inline_documentation' => array(
+        'label' => t('Inline documentation'),
+        'custom settings' => FALSE,
+      ),
+    ),
+    'module' => 'inline_documentation',
+  );
+  // Add all inline_documentation names as bundle to the inline_documentation
+  // item.
+  foreach (inline_documentation_get_names() as $machine_name => $inline_documentation) {
+    $entities['inline_documentation_item']['bundles'][$machine_name] = array(
+      'label' => $inline_documentation->name,
+      'admin' => array(
+        'path' => 'inline_documentation/%inline_documentation_machine_name',
+        'real path' => "inline_documentation/{$machine_name}",
+        'bundle argument' => 1,
+        'access callback' => 'inline_documentation_user_access',
+        'access arguments' => array('edit', 1),
+      ),
+    );
+  }
+  // Declare the 'inline_documentation' entity.
+  $entities['inline_documentation'] = array(
+    'label' => t('Inline documentation'),
+    'controller class' => 'inlineDocumentationController',
+    'base table' => 'inline_documentation_data',
+    'entity keys' => array(
+      'id' => 'did',
+      'label' => 'name',
+    ),
+    'fieldable' => FALSE,
+    'access callback' => 'inline_documentation_entity_access',
+    'module' => 'inline_documentation',
+  );
+  return $entities;
+}
+
+/**
+ * Implements hook_entity_property_info().
+ */
+function inline_documentation_entity_property_info() {
+  $info = array();
+  // Add meta-data about the basic inline_documentation item properties.
+  $properties = &$info['inline_documentation_item']['properties'];
+
+  // inline_documentation item related properties.
+  $properties['iid'] = array(
+    'label' => t('Inline documentation item ID'),
+    'description' => t('The unique ID of the inline documentation item.'),
+    'type' => 'integer',
+    'schema field' => 'iid',
+  );
+  $properties['name'] = array(
+    'label' => t('Name'),
+    'description' => t('The name of the inline documentation item.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'required' => TRUE,
+    'schema field' => 'name',
+  );
+  $properties['description'] = array(
+    'label' => t('Description'),
+    'description' => t('The description of the inline documentation item.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'required' => TRUE,
+    'schema field' => 'name',
+  );
+  $properties['element'] = array(
+    'label' => t('Element'),
+    'description' => t('The element the inline_documentation item is attached to.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'schema field' => 'element',
+  );
+  $properties['inline_documentation'] = array(
+    'label' => t('Inline documentation'),
+    'description' => t('The inline documentation the inline documentation item belongs to.'),
+    'setter callback' => 'inline_documentation_metadata_inline_documentation_item_setter',
+    'type' => 'inline_documentation',
+    'required' => TRUE,
+    'schema field' => 'did',
+  );
+
+  // Add meta-data about the basic inline_documentation properties.
+  $properties = &$info['inline_documentation']['properties'];
+
+  // inline_documentation related variables.
+  $properties['did'] = array(
+    'label' => t('Inline documentation ID'),
+    'description' => t('The unique ID of the inline documentation.'),
+    'type' => 'integer',
+    'schema field' => 'did',
+  );
+  $properties['name'] = array(
+    'label' => t('Name'),
+    'description' => t('The name of the inline documentation.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'required' => TRUE,
+    'schema field' => 'name',
+  );
+  $properties['machine_name'] = array(
+    'label' => t('Machine name'),
+    'description' => t('The machine name of the inline documentation.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'type' => 'token',
+    'required' => TRUE,
+    'schema field' => 'machine_name',
+  );
+  $properties['description'] = array(
+    'label' => t('Description'),
+    'description' => t('The optional description of the inline_documentation.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'sanitize' => 'filter_xss',
+    'schema field' => 'description',
+  );
+
+  return $info;
+}
+
+/**
+ * Implements hook_entity_view().
+ */
+function inline_documentation_entity_view($entity, $type, $view_mode, $langcode) {
+  // Only process inline_documentation entities.
+  if ($type == 'inline_documentation') {
+    // Build the inline_documentation.
+    $inline_documentation = inline_documentation_embed_inline_documentation($entity->did, $langcode);
+    // Remove the name from the inline_documentation which will be provided by
+    // the entity view logic.
+    unset($inline_documentation['name']);
+    // Assign the inline_documentation to the entity.
+    $entity->content = $inline_documentation;
+  }
+}
+
+/**
+ * Implements hook_field_extra_fields().
+ */
+function inline_documentation_field_extra_fields() {
+  $return = array();
+  $info = entity_get_info('inline_documentation_item');
+  foreach (array_keys($info['bundles']) as $bundle) {
+    $return['inline_documentation_item'] = array(
+      $bundle => array(
+        'form' => array(
+          'name' => array(
+            'label' => t('Name'),
+            'description' => t('Inline documentation item name textfield'),
+            'weight' => -5,
+          ),
+        ),
+      ),
+    );
+  }
+  return $return;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function inline_documentation_menu() {
+  $items = array();
+  // Administration pages for inline_documentation.
+  $items['admin/structure/inline_documentation'] = array(
+    'title' => 'Inline documentation',
+    'description' => 'Create and manage inline documentation.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('inline_documentation_form_overview_inline_documentation_bundles'),
+    'access arguments' => array('administer inline_documentation'),
+    'file' => 'inline_documentation.admin.inc',
+  );
+  $items['admin/structure/inline_documentation/list'] = array(
+    'title' => 'List inline documentation bundles',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+  $items['admin/structure/inline_documentation/add'] = array(
+    'title' => 'Add inline documentation bundle',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('inline_documentation_form_inline_documentation_bundle'),
+    'access arguments' => array('administer inline_documentation'),
+    'type' => MENU_LOCAL_ACTION,
+    'file' => 'inline_documentation.admin.inc',
+  );
+  $items['admin/structure/inline_documentation/%inline_documentation_machine_name/edit'] = array(
+    'title' => 'Edit inline documentation bundle',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('inline_documentation_form_inline_documentation_bundle', 3),
+    'access arguments' => array('administer inline_documentation'),
+    'file' => 'inline_documentation.admin.inc',
+  );
+  $items['admin/structure/inline_documentation/%inline_documentation_machine_name/delete'] = array(
+    'title' => 'Delete inline documentation bundle',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('inline_documentation_form_confirm_delete_inline_documentation_bundle', 3),
+    'access arguments' => array('administer inline_documentation'),
+    'file' => 'inline_documentation.admin.inc',
+  );
+  // Administration and user pages for an inline_documentation.
+  $items['inline_documentation/%inline_documentation_machine_name'] = array(
+    'title callback' => 'inline_documentation_title',
+    'title arguments' => array(1),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('inline_documentation_form_overview_inline_documentation_items', 1),
+    'access callback' => 'inline_documentation_user_access',
+    'access arguments' => array('edit', 1),
+    'file' => 'inline_documentation.pages.inc',
+  );
+  $items['inline_documentation/%inline_documentation_machine_name/list'] = array(
+    'title' => 'List items',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -20,
+  );
+  $items['inline_documentation/%inline_documentation_machine_name/add'] = array(
+    'title' => 'Add inline documentation item',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('inline_documentation_form_inline_documentation_item', array(), 1),
+    'access callback' => 'inline_documentation_user_access',
+    'access arguments' => array('edit', 1),
+    'type' => MENU_LOCAL_ACTION,
+    'file' => 'inline_documentation.pages.inc',
+  );
+  $items['inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item'] = array(
+    'title callback' => 'inline_documentation_item_title',
+    'title arguments' => array(3),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('inline_documentation_form_inline_documentation_item', 3, 1),
+    'access callback' => 'inline_documentation_user_access',
+    'access arguments' => array('edit', 1),
+    'file' => 'inline_documentation.pages.inc',
+  );
+  $items['inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item/edit'] = array(
+    'title' => 'Edit item',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 0,
+  );
+  $items['inline_documentation/%/item/%/list'] = array(
+    'title' => 'List items',
+    'page callback' => 'inline_documentation_redirect_to_inline_documentation_item_overview',
+    'page arguments' => array(1),
+    'access callback' => 'inline_documentation_user_access',
+    'access arguments' => array('edit', 1),
+    'file' => 'inline_documentation.pages.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => -10,
+  );
+  $items['inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item/delete'] = array(
+    'title' => 'Delete item',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('inline_documentation_form_confirm_delete_inline_documentation_item', 3),
+    'access callback' => 'inline_documentation_user_access',
+    'access arguments' => array('delete', 1),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'inline_documentation.pages.inc',
+    'weight' => 10,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_admin_paths().
+ */
+function inline_documentation_admin_paths() {
+  return array(
+    'inline_documentation/*' => TRUE,
+  );
+}
+
+/**
+ * Implements hook_permission().
+ */
+function inline_documentation_permission() {
+  // Administer inline documentation permission.
+  $permissions = array(
+    'administer inline_documentation' => array(
+      'title' => t('Administer inline documentations and items'),
+    ),
+  );
+  // Iterate through the inline documentation bundles.
+  foreach (inline_documentation_get_names() as $machine_name => $inline_documentation_info) {
+    // Create the translation arguments.
+    $t_args = array('%inline_documentation' => $inline_documentation_info->name);
+    // Add the edit and delete permission.
+    $permissions['edit inline_documentation ' . $machine_name] = array(
+      'title' => t('Edit inline documentation bundle and items in %inline_documentation', $t_args),
+    );
+    $permissions['delete inline_documentation ' . $machine_name] = array(
+      'title' => t('Delete inline documentation items from %inline_documentation', $t_args),
+    );
+  }
+  // Return all permissions.
+  return $permissions;
+}
+
+/**
+ * Implements hook_help().
+ */
+function inline_documentation_help($path, $arg) {
+  switch ($path) {
+    case 'admin/structure/inline_documentation':
+      return '<p>' . t('Inline documentation provides the ability to add documentation on the pages and elements where you need it. No more browsing through manuals, wiki pages and code docs.') . '</p>';
+  }
+}
+
+/**
+ * Implements hook_library().
+ */
+/*function inline_documentation_library() {
+  $libraries = array();
+  // jQuery HoverIntent plugin.
+  $libraries['jquery.hoverIntent'] = array(
+    'title' => 'jQuery HoverIntent',
+    'website' => 'http://plugins.jquery.com/project/hoverIntent',
+    'version' => '5',
+    'js' => array(
+      drupal_get_path('module', 'inline_documentation') . '/libraries/hoverIntent/jquery.hoverIntent.minified.js' => array(),
+    ),
+    'dependencies' => array(
+      // Require jQuery core.
+      array('system', 'jquery'),
+    ),
+  );
+  // Add the BeautyTip library.
+  $libraries['jquery.beautytips'] = array(
+    'title' => 'jQuery BeautyTips',
+    'website' => 'http://plugins.jquery.com/project/bt',
+    'version' => '0.9.5-rc1',
+    'js' => array(
+      drupal_get_path('module', 'inline_documentation') . '/libraries/bt/jquery.bt.min.js' => array(),
+    ),
+    'css' => array(
+      drupal_get_path('module', 'inline_documentation') . '/libraries/bt/jquery.bt.css' => array(
+        'type' => 'file',
+        'media' => 'screen',
+      ),
+    ),
+    'dependencies' => array(
+      // Require jQuery core.
+      array('system', 'jquery'),
+      // Require jQuery Once plugin.
+      array('system', 'jquery.once'),
+      // Require jQuery HoverIntent plugin.
+      array('inline_documentation', 'jquery.hoverIntent'),
+    ),
+  );
+  return $libraries;
+}*/
+
+/**
+ * Implements hook_theme().
+ */
+function inline_documentation_theme() {
+  return array(
+    'inline_documentation_form_overview_inline_documentation_bundles' => array(
+      'render element' => 'form',
+      'file' => 'inline_documentation.theme.inc',
+    ),
+    'inline_documentation_form_overview_inline_documentation_items' => array(
+      'render element' => 'form',
+      'file' => 'inline_documentation.theme.inc',
+    ),
+  );
+}
+
+/*
+ * Menu callback functions.
+ */
+
+/**
+ * Get a value indicating whether the user perform the operation.
+ *
+ * @param string $operation
+ *   An operation to perform on the inline_documentation. Valid values are:
+ *   <ul>
+ *     <li>view</li>
+ *     <li>edit</li>
+ *     <li>delete</li>
+ *   </ul>
+ * @param mixed $object
+ *   An inline documentation ID, machine name or object on which the operation
+ *   will be performed.
+ *
+ * @return bool
+ *   TRUE if the user has permission to perform the operation, otherwise FALSE.
+ */
+function inline_documentation_user_access($operation, $object, $account = NULL) {
+  static $valid_operations = array('view', 'edit', 'delete');
+  // Check if the user is not an administrator and validate the operation.
+  if (!($granted = user_access('administer inline_documentation', $account)) && in_array($operation, $valid_operations)) {
+    // If the $inline_documentation argument is a string.
+    if (is_string($object)) {
+      // Then assume it's the inline_documentation machine name and try to load
+      // the inline documentation bundle.
+      $object = inline_documentation_machine_name_load($object);
+    }
+    // If the $inline_documentation argument is a numeric.
+    elseif (is_numeric($object)) {
+      // Then assume its the inline documentation ID and try to load the
+      // inline documentation bundle.
+      $object = inline_documentation_load($object);
+    }
+    // Check if the operation describes a view operation.
+    if ($operation == 'view') {
+      // Check for the access content access right.
+      $granted = user_access('access content', $account);
+    }
+    else {
+      // Get the machine name.
+      $machine_name = isset($object->machine_name) ? $object->machine_name : $object->inline_documentation_machine_name;
+      // A user which has not the correct permission will be evaluated for a
+      // specific inline documentation permission. Retrieve a value indicating
+      // whether the current user has permission to perform the specified
+      // operation on the inline documentation bundle.
+      $granted = user_access("{$operation} inline_documentation {$machine_name}", $account);
+    }
+  }
+  return $granted;
+}
+
+/**
+ * Get the inline documentation bundle name which can be used as page title.
+ */
+function inline_documentation_title($inline_documentation) {
+  return $inline_documentation->name;
+}
+
+/**
+ * Get the inline documentation item name which can be used as page title.
+ */
+function inline_documentation_item_title($inline_documentation_item) {
+  return $inline_documentation_item->name;
+}
+
+/*
+ * Entity API callback functions.
+ */
+
+/**
+ * Access callback for the inline documentation bundle entities.
+ */
+function inline_documentation_entity_access($op, $entity, $account, $entity_type) {
+  // Determine whether the given account has access to the entity for the
+  // specified operation.
+  return inline_documentation_user_access($op, $entity, $account);
+}
+
+/**
+ * Entity API property setter callback inline documentation item.
+ */
+function inline_documentation_metadata_inline_documentation_item_setter($inline_documentation_item, $name, $value) {
+  // Evaluate the property name.
+  if ($name == 'inline_documentation') {
+    // Make sure to also update the inline documentation bundle key.
+    $inline_documentation = inline_documentation_load($value);
+    $inline_documentation_item->inline_documentation_machine_name = $inline_documentation->machine_name;
+    return $inline_documentation_item->did = $value;
+  }
+}
+
+/*
+ * Module API functions.
+ */
+
+/**
+ * Generate an renderable array for the specified inline documentation.
+ *
+ * @param mixed $did
+ *   An inline documentation ID or inline documentation machine name.
+ * @param string $langcode
+ *   The language in which the inline documentation needs to be rendered.
+ *
+ * @return array
+ *   A renderable array for the specified inline documentation if found,
+ *   otherwise NULL.
+ */
+function inline_documentation_embed_inline_documentation($did, $langcode = NULL) {
+  // Initialize inline documentation renderable array.
+  $inline_documentation_renderable_array = NULL;
+  // Retrieve the inline documentation by ID or by machine name.
+  if (!is_numeric($did) && is_string($did)) {
+    // Load inline documentation by machine name.
+    $inline_documentation = inline_documentation_machine_name_load($did);
+    // Retrieve the did if the inline documentation is set.
+    if (isset($inline_documentation)) {
+      $did = $inline_documentation->did;
+    }
+  }
+  else {
+    // Load the inline documentation by ID.
+    $inline_documentation = inline_documentation_load($did);
+  }
+
+  // Validate loaded inline documentation.
+  if ($inline_documentation) {
+    // Generate a unique ID for the current embed request.
+    // A unique ID is needed to prevent collisions between multiple inline
+    // documentation bundles on one page.
+    $inline_documentation_id = drupal_hash_base64(uniqid(mt_rand(), TRUE) . mt_rand());
+
+    // Construct the table data. This structure represents the table data layout
+    // for the TableData class.
+    $table_data = (object) array(
+      // Define the columns.
+      'cols' => array(
+        // This column contains the formatted name of the inline documentation
+        // item, the value for this column is the inline documentation item ID.
+        (object) array(
+          'id' => 'inline_documentation_item',
+          'label' => '',
+          'pattern' => '',
+          'type' => 'string',
+        ),
+        // This column contains the iid which links to the parent inline
+        // documentation item.
+        (object) array(
+          'id' => 'parent',
+          'label' => '',
+          'pattern' => '',
+          'type' => 'string',
+        ),
+      ),
+      // Initialize rows array. This will contain all the row data for the
+      // table.
+      'rows' => array(),
+    );
+    // Construct the inline documentation renderable array.
+    $inline_documentation_renderable_array = array(
+      '#prefix' => '<div class="inline_documentation inline_documentation-' . $did . '">',
+      '#suffix' => '</div>',
+      'name' => array('#markup' => '<h2>' . check_plain($inline_documentation->name) . '</h2>'),
+      'description_wrapper' => array(
+        '#type' => 'container',
+        '#attributes' => array('class' => 'description'),
+        'description' => array('#markup' => '<p>' . check_plain($inline_documentation->description) . '</p>'),
+      ),
+      'inline_documentation_items' => array(
+        '#type' => 'container',
+        '#attributes' => array('id' => "inline_documentation-items-{$inline_documentation_id}", 'class' => 'inline_documentation-items'),
+      ),
+    );
+    // Retrieve the inline documentation items by reference.
+    $inline_documentation_items_renderable_array = &$inline_documentation_renderable_array['inline_documentation_items'];
+
+    // Retrieve the inline documentation tree.
+    $inline_documentation_tree = inline_documentation_get_tree($did, 0, NULL, TRUE);
+    // Iterate through the inline documentation tree.
+    foreach ($inline_documentation_tree as $tree_item) {
+      // Construct inline documentation item ID.
+      $inline_documentation_item_id = "{$inline_documentation_id}-{$tree_item->iid}";
+      // Construct inline documentation item row and add it to the rows array.
+      $table_data->rows[] = (object) array(
+        'c' => array(
+          // Add the inline_documentation item ID prefixed with the inline_documentation ID and with
+          // the name as formatted value. The inline_documentation item name div is used
+          // to correctly identify the parent td.
+          (object) array('v' => $inline_documentation_item_id, 'f' => '<div id="inline_documentation-item-name-' . $inline_documentation_item_id . '" class="inline_documentation-item-name">' . check_plain($tree_item->name) . '</div>'),
+          // Add the parent inline_documentation item ID prefixed with the inline_documentation ID.
+          (object) array('v' => (empty($tree_item->parent) ? NULL : "{$inline_documentation_id}-{$tree_item->parent}")),
+        ),
+      );
+      // Render the inline_documentation item for non-javascript support.
+      $inline_documentation_item_view = entity_view('inline_documentation_item', array($tree_item), 'inline_documentation', $langcode);
+      // Retrieve the inline_documentation item view.
+      $inline_documentation_item_view = $inline_documentation_item_view['inline_documentation_item'][$tree_item->iid];
+      // Add wrapper div needed to locate the content for the BeautyTips.
+      $inline_documentation_item_view['#prefix'] = '<div id="inline_documentation-item-wrapper-' . $inline_documentation_item_id . '" class="inline_documentation-item-wrapper">';
+      $inline_documentation_item_view['#suffix'] = '</div>';
+      // Add the rendered inline_documentation item to the inline_documentation items render array.
+      $inline_documentation_items_renderable_array[$tree_item->iid] = $inline_documentation_item_view;
+    }
+/*
+    // Only add javascript if the inline_documentation contains inline_documentation items.
+    if (!empty($inline_documentation_tree)) {
+      // Include the Google API JavaScript.
+      drupal_add_js('https://www.google.com/jsapi', array('type' => 'external', 'group' => JS_LIBRARY));
+      // Add the jQuery BeautyTips plugin.
+      drupal_add_library('inline_documentation', 'jquery.beautytips');
+      // Include the inline_documentation content loader.
+      drupal_add_js(drupal_get_path('module', 'inline_documentation') . '/inline_documentation.js');
+      // Encode the inline_documentation table data add the inline_documentation to the inline_documentations
+      // list.
+      drupal_add_js(array('inline_documentation' => array('inline_documentations' => array($inline_documentation_id => drupal_json_encode($table_data)))), 'setting');
+      // Add close button image url.
+      drupal_add_js(array('inline_documentation' => array('images' => array('close_button' => url(drupal_get_path('module', 'inline_documentation') . '/images/close.png')))), 'setting');
+      // Add CSS style for the inline_documentation BeautyTips (only affects the close
+      // button).
+      drupal_add_css(drupal_get_path('module', 'inline_documentation') . '/inline_documentation.css');
+    }*/
+  }
+  // Return the inline documentation renderable array.
+  return $inline_documentation_renderable_array;
+}
+
+/**
+ * Get a list of the inline documentation bundle names.
+ *
+ * @return array
+ *   An array of inline documentation ids, names and machine names, keyed by
+ *   machine name.
+ */
+function inline_documentation_get_names() {
+  // Retrieve all inline documentation bundles.
+  $names = db_query('SELECT name, machine_name, did FROM {inline_documentation_data}')->fetchAllAssoc('machine_name');
+  // Return the inline documentation bundles.
+  return $names;
+}
+
+/**
+ * Get a list of inline documentation objects.
+ *
+ * @return array
+ *   An array of inline documentation objects, keyed by the inline
+ *   documentation ID.
+ */
+function inline_documentation_get_inline_documentation_bundles() {
+  // Load all inline documentation objects and return the list.
+  return inline_documentation_load_multiple(FALSE, array());
+}
+
+/**
+ * Create a hierarchical representation of an inline documentation bundle.
+ *
+ * @param int $did
+ *   An inline_documentation ID.
+ * @param bool $load_entities
+ *   If TRUE, a full entity load will occur on the inline documentation item
+ *   objects. Otherwise they are partial objects queried directly from the
+ *   {inline_documentation_item_data} table to save execution time and memory
+ *   consumption when listing large numbers of inline documentation items.
+ *   Defaults to FALSE.
+ *
+ * @return array
+ *   An array of all inline documentation item objects in the tree.
+ *   Results are statically cached. Inline documentation item objects will be
+ *   partial or complete depending on the $load_entities parameter.
+ */
+function inline_documentation_get_tree($did, $load_entities = FALSE) {
+  // Retrieve the static cache.
+  $inline_documentation_items = &drupal_static(__FUNCTION__ . ':inline_documentation_items', array());
+  // Check if the did is cached.
+  if (!isset($inline_documentation_items[$did])) {
+    // Initialize the arrays for the given did.
+    $inline_documentation_items[$did] = array();
+    // Construct hierarchy query.
+    $query = db_select('inline_documentation_item_data', 'did');
+    $result = $query
+      ->addTag('translatable')
+      ->addTag('inline_documentation_item_access')
+      ->fields('did')
+      ->condition('did.did', $did)
+      ->orderBy('did.name')
+      ->execute();
+    // Iterate through the result set.
+    foreach ($result as $inline_documentation_item) {
+      // Add the inline document.
+      $inline_documentation_items[$did][$inline_documentation_item->iid] = $inline_documentation_item;
+    }
+  }
+
+  // Load full entities, if necessary. The entity controller statically caches
+  // the results.
+  if ($load_entities) {
+    $inline_documentation_items_entities = inline_documentation_item_load_multiple(array_keys($inline_documentation_items[$did]));
+  }
+
+  $tree = array();
+  foreach ($inline_documentation_items[$did] as $item) {
+    // Retrieve the inline documentation item. This can be an queried entity or
+    // a fully loaded entity depending on the load_entities value.
+    $inline_documentation_item = ($load_entities ? $inline_documentation_items_entities[$did][$item->iid] : $item);
+    // Add the item to the tree.
+    $tree[] = $inline_documentation_item;
+  }
+
+  // Return the constructed tree.
+  return $tree;
+}
+
+/**
+ * Get an inline documentation object matching an inline documentation machine
+ * name.
+ *
+ * @param string $name
+ *   An inline documentation machine name.
+ *
+ * @return mixed
+ *   An inline documentation object with all of its metadata if exists,
+ *   otherwise FALSE. Results are statically cached.
+ */
+function inline_documentation_machine_name_load($name) {
+  // Retrieve the inline documentations containing the name.
+  $inline_documentation_bundles = inline_documentation_load_multiple(FALSE, array('machine_name' => $name));
+  // Return the first entry.
+  return reset($inline_documentation_bundles);
+}
+
+/**
+ * Try to map a string to an existing inline documentation item, as for
+ * glossary use.
+ *
+ * @param string $name
+ *   An inline documentation item name to search for.
+ *
+ * @return array
+ *   An array of matching inline documentation item objects.
+ */
+function inline_documentation_get_item_by_name($name) {
+  return inline_documentation_item_load_multiple(FALSE, array('name' => trim($name)));
+}
+
+/**
+ * Get an inline documentation object matching the inline documentation ID.
+ *
+ * @param int $did
+ *   An inline documentation ID.
+ *
+ * @return object
+ *   An inline documentation object if exists, otherwise FALSE. Results are
+ *   statically cached.
+ */
+function inline_documentation_load($did) {
+  // Initialize the inline documentation to FALSE.
+  $inline_documentation = FALSE;
+  // Validate did argument.
+  if (is_numeric($did)) {
+    // Load the inline documentation.
+    $inline_documentations = inline_documentation_load_multiple(array($did), array());
+    // Assign the first entry to inline documentations.
+    $inline_documentation = reset($inline_documentations);
+  }
+  // Return the inline documentation.
+  return $inline_documentation;
+}
+
+/**
+ * Get an inline documentation item object matching the item ID.
+ *
+ * @param int $iid
+ *   An inline documentation item ID.
+ *
+ * @return object
+ *   An inline documentation item object if exists, otherwise FALSE. Results are
+ *   statically cached.
+ */
+function inline_documentation_item_load($iid) {
+  // Initialize the inline documentation item to FALSE.
+  $inline_documentation_item = FALSE;
+  // Validate iid argument.
+  if (is_numeric($iid)) {
+    // Load the inline documentation item.
+    $inline_documentation_items = inline_documentation_item_load_multiple(array($iid), array());
+    // Assign the first entry to inline_documentation_item.
+    $inline_documentation_item = reset($inline_documentation_items);
+  }
+  // Return the inline documentation item.
+  return $inline_documentation_item;
+}
+
+/**
+ * Load multiple inline documentation bundles based on certain conditions.
+ *
+ * This function should be used whenever you need to load more than one
+ * inline documentation bundle from the database. Inline documentations bundles
+ * are loaded into memory and will not require database access if loaded again
+ * during the same page request.
+ *
+ * @param array $dids
+ *   An array of inline documentation IDs.
+ * @param array $conditions
+ *   An associative array of conditions on the {inline_documentation} table,
+ *   where the keys are the database fields and the values are the values those
+ *   fields must have. Instead, it is preferable to use EntityFieldQuery to
+ *   retrieve a list of entity IDs loadable by this function.
+ *
+ * @return array
+ *   An array of inline documentation objects, keyed by did.
+ *
+ * @see entity_load()
+ * @see EntityFieldQuery
+ */
+function inline_documentation_load_multiple($dids = array(), $conditions = array()) {
+  // Retrieve an array of inline documentation objects using the specified
+  // conditions and return the result.
+  return entity_load('inline_documentation', $dids, $conditions);
+}
+
+/**
+ * Load multiple inline documentation items based on certain conditions.
+ *
+ * This function should be used whenever you need to load more than one
+ * inline documentation item from the database. Inline documentation items are
+ * loaded into memory and will not require database access if loaded again
+ * during the same page request.
+ *
+ * @param array $iids
+ *   An array of inline documentation item IDs.
+ * @param array $conditions
+ *   An associative array of conditions on the {inline_documentation_item_data}
+ *   table, where the keys are the database fields and the values are the values
+ *   those fields must have. Instead, it is preferable to use EntityFieldQuery
+ *   to retrieve a list of entity IDs loadable by this function.
+ *
+ * @return array
+ *   An array of inline documentation item objects, indexed by iid.
+ *
+ * @see entity_load()
+ * @see EntityFieldQuery
+ */
+function inline_documentation_item_load_multiple($iids = array(), $conditions = array()) {
+  // Retrieve an array of inline documentation item objects using the specified
+  // conditions and return the result.
+  return entity_load('inline_documentation_item', $iids, $conditions);
+}
+
+/**
+ * Save an inline documentation bundle.
+ *
+ * @param object $inline_documentation
+ *   An inline documentation bundle object.
+ *
+ * @return int
+ *   The SAVED_NEW or SAVED_UPDATED if successful, otherwise NULL.
+ */
+function inline_documentation_save($inline_documentation) {
+  // Prevent leading and trailing spaces in inline documentation bundle names.
+  $inline_documentation->name = trim($inline_documentation->name);
+  // Load the stored entity, if any.
+  if (!empty($inline_documentation->did)) {
+    // If the original property is not set.
+    if (!isset($inline_documentation->original)) {
+      // Load an unchanged inline documentation object.
+      $inline_documentation->original = entity_load_unchanged('inline_documentation', $inline_documentation->did);
+    }
+    $inline_documentation->old_machine_name = $inline_documentation->original->machine_name;
+  }
+  // If the module property is missing.
+  if (!isset($inline_documentation->module)) {
+    // Then use the 'inline_documentation' as creator module.
+    $inline_documentation->module = 'inline_documentation';
+  }
+  // Allow modules to perform modifications to the inline documentation.
+  module_invoke_all('inline_documentation_presave', $inline_documentation);
+  module_invoke_all('entity_presave', $inline_documentation, 'inline_documentation');
+  // Initialize the status variable.
+  $status = NULL;
+  // If the did and name is not empty.
+  if (!empty($inline_documentation->did) && !empty($inline_documentation->name)) {
+    // Write the inline documentation to the database.
+    $status = drupal_write_record('inline_documentation_data', $inline_documentation, 'did');
+    // If the inline documentation machine name changed.
+    if ($inline_documentation->old_machine_name != $inline_documentation->machine_name) {
+      // Rename the field bundle.
+      field_attach_rename_bundle('inline_documentation_item', $inline_documentation->old_machine_name, $inline_documentation->machine_name);
+    }
+    // Allow modules to perform action on update.
+    module_invoke_all('inline_documentation_update', $inline_documentation);
+    module_invoke_all('entity_update', $inline_documentation, 'inline_documentation');
+  }
+  elseif (empty($inline_documentation->did)) {
+    // Write the inline documentation to the database.
+    $status = drupal_write_record('inline_documentation_data', $inline_documentation);
+    // Attach the field bundle.
+    field_attach_create_bundle('inline_documentation_item', $inline_documentation->machine_name);
+    // Allow modules to perform action on insert.
+    module_invoke_all('inline_documentation_insert', $inline_documentation);
+    module_invoke_all('entity_insert', $inline_documentation, 'inline_documentation');
+  }
+  // Remove the original and old_machine_name property.
+  unset($inline_documentation->original);
+  unset($inline_documentation->old_machine_name);
+  // Clear cache.
+  cache_clear_all();
+  // Request entity cache reset for the given did.
+  entity_get_controller('inline_documentation')->resetCache(array($inline_documentation->did));
+  // Return the operation status.
+  return $status;
+}
+
+/**
+ * Save an inline documentation item.
+ *
+ * @param object $inline_documentation_item
+ *   An inline documentation item object.
+ *
+ * @return int
+ *   The SAVED_NEW or SAVED_UPDATED if successful, otherwise NULL.
+ */
+function inline_documentation_item_save($inline_documentation_item) {
+  // Prevent leading and trailing spaces in the inline documentation item name.
+  $inline_documentation_item->name = trim($inline_documentation_item->name);
+  // If the inline documentation machine name is not set, then load the inline
+  // documentation and assign the machine name.
+  if (!isset($inline_documentation_item->inline_documentation_machine_name)) {
+    // Load the inline documentation using the inline documentation ID.
+    $inline_documentation = inline_documentation_item_load($inline_documentation_item->did);
+    // Assign the inline_documentation_machine_name property to the inline
+    // documentation item.
+    $inline_documentation_item->inline_documentation_machine_name = $inline_documentation->machine_name;
+  }
+  // Load the stored entity, if any.
+  if (!empty($inline_documentation_item->iid) && !isset($inline_documentation_item->original)) {
+    // Load the unchanged entity object.
+    $inline_documentation_item->original = entity_load_unchanged('inline_documentation_item', $inline_documentation_item->iid);
+  }
+  // Allow modules to perform logic on presave.
+  field_attach_presave('inline_documentation_item', $inline_documentation_item);
+  module_invoke_all('inline_documentation_item_presave', $inline_documentation_item);
+  module_invoke_all('entity_presave', $inline_documentation_item, 'inline_documentation_item');
+  // Perform insert is no iid iset.
+  if (empty($inline_documentation_item->iid)) {
+    // Save operation (used for hooks).
+    $op = 'insert';
+    // Write inline documentation item to database.
+    $status = drupal_write_record('inline_documentation_item_data', $inline_documentation_item);
+    field_attach_insert('inline_documentation_item', $inline_documentation_item);
+  }
+  else {
+    // Save operation (used for hooks).
+    $op = 'update';
+    // Write inline documentation item to database.
+    $status = drupal_write_record('inline_documentation_item_data', $inline_documentation_item, 'iid');
+    field_attach_update('inline_documentation_item', $inline_documentation_item);
+  }
+  // Reset the inline documentation item cache.
+  inline_documentation_items_static_reset();
+  // Allow modules to react upon insert or update.
+  module_invoke_all("inline_documentation_item_{$op}", $inline_documentation_item);
+  module_invoke_all("entity_{$op}", $inline_documentation_item, 'inline_documentation_item');
+  // Remove the original property.
+  unset($inline_documentation_item->original);
+  // Return the operation status.
+  return $status;
+}
+
+/**
+ * Delete an inline documentation bundle given the inline documentation ID.
+ *
+ * @param int $did
+ *   An inline documentation bundle ID.
+ *
+ * @return int
+ *   The SAVED_DELETED if successful, otherwise NULL.
+ *
+ * @throws \Exception
+ */
+function inline_documentation_delete($did) {
+  // Retrieve the inline documentation object.
+  $inline_documentation = inline_documentation_load($did);
+  // Start a transaction.
+  $transaction = db_transaction();
+  try {
+    // Retrieve all the inline documentation items assigned to the current
+    // inline documentation.
+    $result = db_query('SELECT iid FROM {inline_documentation_item_data} WHERE did = :did', array(':did' => $did))->fetchCol();
+    // Iterate through the result set.
+    foreach ($result as $iid) {
+      // Remove the inline documentation item.
+      inline_documentation_item_delete($iid);
+    }
+    // Create delete statement.
+    db_delete('inline_documentation_data')
+      ->condition('did', $did)
+      ->execute();
+    // Remove the field bundle.
+    field_attach_delete_bundle('inline_documentation_item', $inline_documentation->machine_name);
+    // Allow modules to perform actions after deletion.
+    module_invoke_all('inline_documentation_delete', $inline_documentation);
+    module_invoke_all('entity_delete', $inline_documentation, 'inline_documentation');
+    // Clear cache.
+    cache_clear_all();
+    // Request entity cache reset for the given did.
+    entity_get_controller('inline_documentation')->resetCache();
+    // Return status deleted.
+    return SAVED_DELETED;
+  }
+  catch (Exception $ex) {
+    // Rollback database modifications.
+    $transaction->rollback();
+    // Log to watchdog.
+    watchdog_exception('inline_documentation', $ex);
+    // Rethrow the exception.
+    throw $ex;
+  }
+}
+
+/**
+ * Delete an inline documentation item.
+ *
+ * @param int $iid
+ *   An inline_documentation item.
+ *
+ * @throws \Exception
+ */
+function inline_documentation_item_delete($iid) {
+  // Start a transaction.
+  $transaction = db_transaction();
+  try {
+    // Check if the inline documentation item exists.
+    if (($inline_documentation_item = inline_documentation_item_load($iid)) !== NULL) {
+      // Remove the inline documentation item.
+      db_delete('inline_documentation_item_data')
+        ->condition('iid', $iid)
+        ->execute();
+      // Remove the bundled data for the specified entity.
+      field_attach_delete('inline_documentation_item', $inline_documentation_item);
+      // Allow modules to act upon the delete action.
+      module_invoke_all('inline_documentation_item_delete', $inline_documentation_item);
+      module_invoke_all('entity_delete', $inline_documentation_item, 'inline_documentation_item');
+      // Reset the inline documentation item cache.
+      inline_documentation_items_static_reset();
+    }
+  }
+  catch (Exception $ex) {
+    // Undo database changes.
+    $transaction->rollback();
+    // Log exception.
+    watchdog_exception('inline_documentation', $ex);
+    // Rethrow the exception.
+    throw $ex;
+  }
+}
+
+/**
+ * Clear all static cache variables for inline documentation items.
+ */
+function inline_documentation_items_static_reset() {
+  drupal_static_reset('inline_documentation_get_tree');
+  drupal_static_reset('inline_documentation_get_tree:inline_documentation_items');
+}
+
+/*
+ * Controller classes for the declared entities.
+ */
+
+/**
+ * Controller class for inline documentations.
+ *
+ * This extends the DrupalDefaultEntityController class, adding required
+ * special handling for inline_documentation objects.
+ */
+class inlineDocumentationController extends EntityAPIController {
+
+  /**
+   * Builds the query to load the entity.
+   *
+   * @param array $ids
+   *   An array of entity IDs, or FALSE to load all entities.
+   * @param array $conditions
+   *   An array of conditions in the form 'field' => $value.
+   * @param mixed $revision_id
+   *   The ID of the revision to load, or FALSE if this query is asking for the
+   *   most current revision(s).
+   *
+   * @return SelectQuery
+   *   A SelectQuery object for loading the entity.
+   */
+  protected function buildQuery($ids, $conditions = array(), $revision_id = FALSE) {
+    $query = parent::buildQuery($ids, $conditions, $revision_id);
+    $query->addTag('translatable');
+    $query->orderBy('base.name');
+    return $query;
+  }
+
+}
+
+/**
+ * Controller class for inline documentation items.
+ *
+ * This extends the DrupalDefaultEntityController class. Only alternation is
+ * that we match the condition on inline documentation item name
+ * case-independently.
+ */
+class inlineDocumentationItemController extends EntityAPIController {
+
+  /**
+   * Builds the query to load the entity.
+   *
+   * @param array $ids
+   *   An array of entity IDs, or FALSE to load all entities.
+   * @param array $conditions
+   *   An array of conditions in the form 'field' => $value.
+   * @param mixed $revision_id
+   *   The ID of the revision to load, or FALSE if this query is asking for the
+   *   most current revision(s).
+   *
+   * @return SelectQuery
+   *   A SelectQuery object for loading the entity.
+   */
+  protected function buildQuery($ids, $conditions = array(), $revision_id = FALSE) {
+    $query = parent::buildQuery($ids, $conditions, $revision_id);
+    $query->addTag('translatable');
+    $query->addTag('inline_documentation_item_access');
+    // When name is passed as a condition use LIKE.
+    if (isset($conditions['name'])) {
+      $query_conditions = &$query->conditions();
+      foreach ($query_conditions as $key => $condition) {
+        if ($condition['field'] == 'base.name') {
+          $query_conditions[$key]['operator'] = 'LIKE';
+          $query_conditions[$key]['value'] = db_like($query_conditions[$key]['value']);
+        }
+      }
+    }
+    // Add the machine name field from the {inline_documentation} table.
+    $query->innerJoin('inline_documentation_data', 'o', 'base.did = o.did');
+    $query->addField('o', 'machine_name', 'inline_documentation_machine_name');
+    return $query;
+  }
+
+  /**
+   * Gets entities from the static cache.
+   *
+   * @param array $ids
+   *   If not empty, return entities that match these IDs.
+   * @param array $conditions
+   *   If set, return entities that match all of these conditions.
+   *
+   * @return array
+   *   Array of entities from the entity cache.
+   */
+  protected function cacheGet($ids, $conditions = array()) {
+    $inline_documentation_items = parent::cacheGet($ids, $conditions);
+    // Name matching is case insensitive, note that with some collations
+    // LOWER() and drupal_strtolower() may return different results.
+    foreach ($inline_documentation_items as $inline_documentation_item) {
+      // Convert inline documentation item to an array.
+      $inline_documentation_item_values = (array) $inline_documentation_item;
+      // Remove any mismatching names.
+      if (isset($conditions['name']) && drupal_strtolower($conditions['name'] != drupal_strtolower($inline_documentation_item_values['name']))) {
+        // Remove the inline documentation item.
+        unset($inline_documentation_items[$inline_documentation_item->iid]);
+      }
+    }
+    return $inline_documentation_items;
+  }
+}

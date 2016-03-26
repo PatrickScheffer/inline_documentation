@@ -1,0 +1,115 @@
+<?php
+/**
+ * @file
+ * Defines the schema for the inline_documentation module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function inline_documentation_schema() {
+  $schema = array();
+  // Entity 'inline_documentation_item' base table.
+  $schema['inline_documentation_item_data'] = array(
+    'description' => 'Base table for the inline documentation item entity',
+    'fields' => array(
+      'iid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique inline documentation item ID.',
+      ),
+      'did' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The {inline_documentation}.did of the inline documentation bundle to which the term is assigned.',
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'The inline documentation item name.',
+        'translatable' => TRUE,
+      ),
+      'description' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'description' => 'Description of the inline documentation item.',
+        'translatable' => TRUE,
+      ),
+      'element' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+        'default' => '',
+        'description' => 'The HTML element this item is attached to.',
+        'translatable' => FALSE,
+      ),
+    ),
+    'primary key' => array('iid'),
+    'foreign keys' => array(
+      'inline_documentation' => array(
+        'table' => 'inline_documentation_data',
+        'columns' => array('did' => 'did'),
+      ),
+    ),
+    'indexes' => array(
+      'inline_documentation_tree' => array('did', 'name'),
+      'did_name' => array('did', 'name'),
+      'name' => array('name'),
+    ),
+  );
+  // Entity 'inline_documentation' base table.
+  $schema['inline_documentation_data'] = array(
+    'description' => 'Base table for the inline documentation entity',
+    'fields' => array(
+      'did' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique inline documentation ID.',
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'Name of the inline documentation.',
+        'translatable' => TRUE,
+      ),
+      'machine_name' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'The inline documentation machine name.',
+      ),
+      'description' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'description' => 'Description of the inline documentation.',
+        'translatable' => TRUE,
+      ),
+      'module' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'The module which created the inline documentation.',
+      ),
+    ),
+    'primary key' => array('did'),
+    'indexes' => array(
+      'list' => array('name'),
+    ),
+    'unique keys' => array(
+      'machine_name' => array('machine_name'),
+    ),
+  );
+  return $schema;
+}
