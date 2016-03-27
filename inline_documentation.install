@@ -88,6 +88,13 @@ function inline_documentation_schema() {
         'default' => '',
         'description' => 'The inline documentation machine name.',
       ),
+      'location' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'description' => 'Location of the inline documentation.',
+        'translatable' => FALSE,
+      ),
       'description' => array(
         'type' => 'text',
         'not null' => FALSE,

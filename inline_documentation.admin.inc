@@ -40,12 +40,12 @@ function inline_documentation_form_overview_inline_documentation_bundles($form) 
     $inline_documentation_element['list'] = array(
       '#type' => 'link',
       '#title' => t('list items'),
-      '#href' => "inline_documentation/{$inline_documentation->machine_name}",
+      '#href' => "admin/structure/inline_documentation/{$inline_documentation->machine_name}",
     );
     $inline_documentation_element['add'] = array(
       '#type' => 'link',
       '#title' => t('add item'),
-      '#href' => "inline_documentation/{$inline_documentation->machine_name}/add",
+      '#href' => "admin/structure/inline_documentation/{$inline_documentation->machine_name}/add",
     );
     $inline_documentation_element['edit'] = array(
       '#type' => 'link',
@@ -83,6 +83,7 @@ function inline_documentation_form_inline_documentation_bundle($form, &$form_sta
     $default = array(
       'name' => '',
       'machine_name' => '',
+      'location' => '',
       'description' => '',
     );
     // Iterate through default values.
@@ -121,6 +122,12 @@ function inline_documentation_form_inline_documentation_bundle($form, &$form_sta
   $form['old_machine_name'] = array(
     '#type' => 'value',
     '#value' => $inline_documentation->machine_name,
+  );
+  $form['location'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Location'),
+    '#description' => t('The location of where the inline documentation should appear. Enter a location per line.'),
+    '#default_value' => $inline_documentation->location,
   );
   $form['description'] = array(
     '#type' => 'textarea',

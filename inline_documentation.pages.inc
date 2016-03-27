@@ -48,7 +48,7 @@ function inline_documentation_form_overview_inline_documentation_items($form, &$
       $element['edit'] = array(
         '#type' => 'link',
         '#title' => t('edit'),
-        '#href' => "inline_documentation/{$inline_documentation->machine_name}/item/{$tree_item->iid}",
+        '#href' => "admin/structure/inline_documentation/{$inline_documentation->machine_name}/item/{$tree_item->iid}",
       );
     }
     else {
@@ -59,14 +59,14 @@ function inline_documentation_form_overview_inline_documentation_items($form, &$
       $element['delete'] = array(
         '#type' => 'link',
         '#title' => t('delete'),
-        '#href' => "inline_documentation/{$inline_documentation->machine_name}/item/{$tree_item->iid}/delete",
+        '#href' => "admin/structure/inline_documentation/{$inline_documentation->machine_name}/item/{$tree_item->iid}/delete",
       );
     }
     else {
       $element['delete'] = array();
     }
   }
-  $form['#empty_text'] = t('No items available. <a href="@link">Add item</a>.', array('@link' => url("inline_documentation/{$inline_documentation->machine_name}/add")));
+  $form['#empty_text'] = t('No items available. <a href="@link">Add item</a>.', array('@link' => url("admin/structure/inline_documentation/{$inline_documentation->machine_name}/add")));
   // Allow user to modify the inline documentation name and description of the
   // inline documentation.
   $form['inline_documentation'] = array(
@@ -82,6 +82,12 @@ function inline_documentation_form_overview_inline_documentation_items($form, &$
     '#default_value' => $inline_documentation->name,
     '#maxlength' => 255,
     '#required' => TRUE,
+  );
+  $form['inline_documentation']['location'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Location'),
+    '#description' => t('The location of where the inline documentation should appear. Enter a location per line.'),
+    '#default_value' => $inline_documentation->location,
   );
   $form['inline_documentation']['description'] = array(
     '#type' => 'textarea',
@@ -100,8 +106,8 @@ function inline_documentation_form_overview_inline_documentation_items($form, &$
  *
  * Used by the following menu items:
  * <ul>
- *   <li>inline_documentation/%inline_documentation_machine_name/add</li>
- *   <li>inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item</li>
+ *   <li>admin/structure/inline_documentation/%inline_documentation_machine_name/add</li>
+ *   <li>admin/structure/inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item</li>
  * </ul>
  */
 function inline_documentation_form_inline_documentation_item($form, &$form_state, $edit = array(), $inline_documentation = NULL) {
@@ -214,7 +220,7 @@ function inline_documentation_form_confirm_delete_inline_documentation_item($for
   return confirm_form(
       $form,
       t('Are you sure you want to delete the inline documentation item %name?', array('%name' => $inline_documentation_item->name)),
-      "inline_documentation/{$inline_documentation_item->inline_documentation_machine_name}/item/{$inline_documentation_item->iid}",
+      "admin/structure/inline_documentation/{$inline_documentation_item->inline_documentation_machine_name}/item/{$inline_documentation_item->iid}",
       t('This action cannot be undone.'),
       t('Delete'),
       t('Cancel')
@@ -274,7 +280,7 @@ function inline_documentation_form_inline_documentation_item_submit($form, &$for
             '%name' => $inline_documentation_item->name,
           ),
           WATCHDOG_NOTICE,
-          l(t('edit'), "inline_documentation/item/{$inline_documentation_item->iid}/edit"));
+          l(t('edit'), "admin/structure/inline_documentation/item/{$inline_documentation_item->iid}/edit"));
       break;
 
     case SAVED_UPDATED:
@@ -286,7 +292,7 @@ function inline_documentation_form_inline_documentation_item_submit($form, &$for
             '%name' => $inline_documentation_item->name,
           ),
           WATCHDOG_NOTICE,
-          l(t('edit'), "inline_documentation/item/{$inline_documentation_item->iid}/edit"));
+          l(t('edit'), "admin/structure/inline_documentation/item/{$inline_documentation_item->iid}/edit"));
       // Clear the page and block caches to avoid stale data.
       cache_clear_all();
       break;
@@ -304,7 +310,7 @@ function inline_documentation_form_confirm_delete_inline_documentation_item_subm
   inline_documentation_item_delete($form_state['values']['iid']);
   drupal_set_message(t('Deleted inline documentation item %name', array('%name' => $form_state['values']['name'])));
   watchdog('inline_documentation', 'Deleted inline documentation item %name', array('%name' => $form_state['values']['name']), WATCHDOG_NOTICE);
-  $form_state['redirect'] = "inline_documentation/{$form_state['values']['inline_documentation_machine_name']}";
+  $form_state['redirect'] = "admin/structure/inline_documentation/{$form_state['values']['inline_documentation_machine_name']}";
   // Clear the page and block caches to avoid stale data.
   cache_clear_all();
 }

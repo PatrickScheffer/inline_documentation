@@ -135,15 +135,32 @@ function inline_documentation_entity_property_info() {
     'required' => TRUE,
     'schema field' => 'machine_name',
   );
+  $properties['location'] = array(
+    'label' => t('Location'),
+    'description' => t('The location of the where the inline documentation should appear.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'required' => FALSE,
+    'schema field' => 'location',
+  );
   $properties['description'] = array(
     'label' => t('Description'),
-    'description' => t('The optional description of the inline_documentation.'),
+    'description' => t('The optional description of the inline documentation.'),
     'setter callback' => 'entity_property_verbatim_set',
     'sanitize' => 'filter_xss',
     'schema field' => 'description',
   );
 
   return $info;
+}
+
+function inline_documentation_preprocess_page(&$variables) {
+  $menu_item = menu_get_item();
+  if (isset($menu_item['path'])) {
+    dpm($menu_item['path']);
+    if ($inline_documentation = inline_documentation_load_by_path($menu_item['path'])) {
+      dpm($inline_documentation);
+    }
+  }
 }
 
 /**
@@ -226,59 +243,59 @@ function inline_documentation_menu() {
     'file' => 'inline_documentation.admin.inc',
   );
   // Administration and user pages for an inline_documentation.
-  $items['inline_documentation/%inline_documentation_machine_name'] = array(
+  $items['admin/structure/inline_documentation/%inline_documentation_machine_name'] = array(
     'title callback' => 'inline_documentation_title',
-    'title arguments' => array(1),
+    'title arguments' => array(3),
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('inline_documentation_form_overview_inline_documentation_items', 1),
+    'page arguments' => array('inline_documentation_form_overview_inline_documentation_items', 3),
     'access callback' => 'inline_documentation_user_access',
-    'access arguments' => array('edit', 1),
+    'access arguments' => array('edit', 3),
     'file' => 'inline_documentation.pages.inc',
   );
-  $items['inline_documentation/%inline_documentation_machine_name/list'] = array(
+  $items['admin/structure/inline_documentation/%inline_documentation_machine_name/list'] = array(
     'title' => 'List items',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -20,
   );
-  $items['inline_documentation/%inline_documentation_machine_name/add'] = array(
+  $items['admin/structure/inline_documentation/%inline_documentation_machine_name/add'] = array(
     'title' => 'Add inline documentation item',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('inline_documentation_form_inline_documentation_item', array(), 1),
+    'page arguments' => array('inline_documentation_form_inline_documentation_item', array(), 3),
     'access callback' => 'inline_documentation_user_access',
-    'access arguments' => array('edit', 1),
+    'access arguments' => array('edit', 3),
     'type' => MENU_LOCAL_ACTION,
     'file' => 'inline_documentation.pages.inc',
   );
-  $items['inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item'] = array(
+  $items['admin/structure/inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item'] = array(
     'title callback' => 'inline_documentation_item_title',
-    'title arguments' => array(3),
+    'title arguments' => array(5),
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('inline_documentation_form_inline_documentation_item', 3, 1),
+    'page arguments' => array('inline_documentation_form_inline_documentation_item', 5, 3),
     'access callback' => 'inline_documentation_user_access',
-    'access arguments' => array('edit', 1),
+    'access arguments' => array('edit', 3),
     'file' => 'inline_documentation.pages.inc',
   );
-  $items['inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item/edit'] = array(
+  $items['admin/structure/inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item/edit'] = array(
     'title' => 'Edit item',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => 0,
   );
-  $items['inline_documentation/%/item/%/list'] = array(
+  $items['admin/structure/inline_documentation/%/item/%/list'] = array(
     'title' => 'List items',
     'page callback' => 'inline_documentation_redirect_to_inline_documentation_item_overview',
-    'page arguments' => array(1),
+    'page arguments' => array(3),
     'access callback' => 'inline_documentation_user_access',
-    'access arguments' => array('edit', 1),
+    'access arguments' => array('edit', 3),
     'file' => 'inline_documentation.pages.inc',
     'type' => MENU_LOCAL_TASK,
     'weight' => -10,
   );
-  $items['inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item/delete'] = array(
+  $items['admin/structure/inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item/delete'] = array(
     'title' => 'Delete item',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('inline_documentation_form_confirm_delete_inline_documentation_item', 3),
+    'page arguments' => array('inline_documentation_form_confirm_delete_inline_documentation_item', 5),
     'access callback' => 'inline_documentation_user_access',
-    'access arguments' => array('delete', 1),
+    'access arguments' => array('delete', 3),
     'type' => MENU_LOCAL_TASK,
     'file' => 'inline_documentation.pages.inc',
     'weight' => 10,
@@ -291,7 +308,7 @@ function inline_documentation_menu() {
  */
 function inline_documentation_admin_paths() {
   return array(
-    'inline_documentation/*' => TRUE,
+    'admin/structure/inline_documentation/*' => TRUE,
   );
 }
 
@@ -301,19 +318,22 @@ function inline_documentation_admin_paths() {
 function inline_documentation_permission() {
   // Administer inline documentation permission.
   $permissions = array(
-    'administer inline_documentation' => array(
-      'title' => t('Administer inline documentations and items'),
+    'administer inline documentation' => array(
+      'title' => t('Administer inline documentation'),
     ),
   );
   // Iterate through the inline documentation bundles.
   foreach (inline_documentation_get_names() as $machine_name => $inline_documentation_info) {
     // Create the translation arguments.
     $t_args = array('%inline_documentation' => $inline_documentation_info->name);
-    // Add the edit and delete permission.
-    $permissions['edit inline_documentation ' . $machine_name] = array(
-      'title' => t('Edit inline documentation bundle and items in %inline_documentation', $t_args),
+    // Add the View, edit and delete permission.
+    $permissions['view inline documentation ' . $machine_name] = array(
+      'title' => t('View inline documentation in %inline_documentation', $t_args),
     );
-    $permissions['delete inline_documentation ' . $machine_name] = array(
+    $permissions['edit inline documentation ' . $machine_name] = array(
+      'title' => t('Edit inline documentation in %inline_documentation', $t_args),
+    );
+    $permissions['delete inline documentation ' . $machine_name] = array(
       'title' => t('Delete inline documentation items from %inline_documentation', $t_args),
     );
   }
@@ -415,7 +435,7 @@ function inline_documentation_theme() {
 function inline_documentation_user_access($operation, $object, $account = NULL) {
   static $valid_operations = array('view', 'edit', 'delete');
   // Check if the user is not an administrator and validate the operation.
-  if (!($granted = user_access('administer inline_documentation', $account)) && in_array($operation, $valid_operations)) {
+  if (!($granted = user_access('administer inline documentation', $account)) && in_array($operation, $valid_operations)) {
     // If the $inline_documentation argument is a string.
     if (is_string($object)) {
       // Then assume it's the inline_documentation machine name and try to load
@@ -428,20 +448,14 @@ function inline_documentation_user_access($operation, $object, $account = NULL) 
       // inline documentation bundle.
       $object = inline_documentation_load($object);
     }
-    // Check if the operation describes a view operation.
-    if ($operation == 'view') {
-      // Check for the access content access right.
-      $granted = user_access('access content', $account);
-    }
-    else {
-      // Get the machine name.
-      $machine_name = isset($object->machine_name) ? $object->machine_name : $object->inline_documentation_machine_name;
-      // A user which has not the correct permission will be evaluated for a
-      // specific inline documentation permission. Retrieve a value indicating
-      // whether the current user has permission to perform the specified
-      // operation on the inline documentation bundle.
-      $granted = user_access("{$operation} inline_documentation {$machine_name}", $account);
-    }
+
+    // Get the machine name.
+    $machine_name = isset($object->machine_name) ? $object->machine_name : $object->inline_documentation_machine_name;
+    // A user which has not the correct permission will be evaluated for a
+    // specific inline documentation permission. Retrieve a value indicating
+    // whether the current user has permission to perform the specified
+    // operation on the inline documentation bundle.
+    $granted = user_access("{$operation} inline documentation {$machine_name}", $account);
   }
   return $granted;
 }
@@ -735,6 +749,13 @@ function inline_documentation_machine_name_load($name) {
  */
 function inline_documentation_get_item_by_name($name) {
   return inline_documentation_item_load_multiple(FALSE, array('name' => trim($name)));
+}
+
+function inline_documentation_load_by_path($path) {
+  // Retrieve all inline documentation ids.
+  $dids = db_query('SELECT did FROM {inline_documentation_data} WHERE location LIKE :path', array(':path' => db_like($path)))->fetchAllAssoc('did');
+  // Return the inline documentation ids.
+  return $dids;
 }
 
 /**
