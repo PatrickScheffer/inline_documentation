@@ -155,10 +155,13 @@ function inline_documentation_entity_property_info() {
 
 function inline_documentation_preprocess_page(&$variables) {
   $menu_item = menu_get_item();
-  if (isset($menu_item['path'])) {
-    dpm($menu_item['path']);
-    if ($inline_documentation = inline_documentation_load_by_path($menu_item['path'])) {
-      dpm($inline_documentation);
+  if (!empty($menu_item['path'])) {
+    $paths = array($menu_item['path']);
+    if (!empty($menu_item['href'])) {
+      $paths[] = $menu_item['href'];
+    }
+    if ($inline_documentation = inline_documentation_load_by_path($paths)) {
+      // @TODO: do something.
     }
   }
 }
@@ -751,9 +754,18 @@ function inline_documentation_get_item_by_name($name) {
   return inline_documentation_item_load_multiple(FALSE, array('name' => trim($name)));
 }
 
-function inline_documentation_load_by_path($path) {
+function inline_documentation_load_by_path($paths) {
+  // Create the where array with placeholders.
+  $where = array();
+  $where_tokens = array();
+  foreach ($paths as $key => $path) {
+    $where[] = 'location LIKE :path' . $key;
+    // Every path must end with a newline.
+    $where_tokens[':path' . $key] = '%' . str_replace('%', '*', $path) . "\n" . '%';
+  }
+
   // Retrieve all inline documentation ids.
-  $dids = db_query('SELECT did FROM {inline_documentation_data} WHERE location LIKE :path', array(':path' => db_like($path)))->fetchAllAssoc('did');
+  $dids = db_query('SELECT did FROM {inline_documentation_data} WHERE ' . implode(' OR ', $where), $where_tokens)->fetchAllAssoc('did');
   // Return the inline documentation ids.
   return $dids;
 }
@@ -874,6 +886,10 @@ function inline_documentation_item_load_multiple($iids = array(), $conditions = 
 function inline_documentation_save($inline_documentation) {
   // Prevent leading and trailing spaces in inline documentation bundle names.
   $inline_documentation->name = trim($inline_documentation->name);
+  // Make sure the locations end with a proper newline.
+  if (!empty(trim($inline_documentation->location))) {
+    $inline_documentation->location = str_replace("\r", "", trim($inline_documentation->location)) . "\n";
+  }
   // Load the stored entity, if any.
   if (!empty($inline_documentation->did)) {
     // If the original property is not set.
