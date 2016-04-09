@@ -18,7 +18,7 @@ function inline_documentation_entity_info() {
     'label' => t('Inline documentation item'),
     'controller class' => 'inlineDocumentationItemController',
     'base table' => 'inline_documentation_item_data',
-    'fieldable' => FALSE,
+    'fieldable' => TRUE,
     'entity keys' => array(
       'id' => 'iid',
       'bundle' => 'inline_documentation_machine_name',
@@ -42,11 +42,11 @@ function inline_documentation_entity_info() {
     $entities['inline_documentation_item']['bundles'][$machine_name] = array(
       'label' => $inline_documentation->name,
       'admin' => array(
-        'path' => 'inline_documentation/%inline_documentation_machine_name',
-        'real path' => "inline_documentation/{$machine_name}",
-        'bundle argument' => 1,
+        'path' => 'admin/structure/inline_documentation/%inline_documentation_machine_name',
+        'real path' => "admin/structure/inline_documentation/{$machine_name}",
+        'bundle argument' => 3,
         'access callback' => 'inline_documentation_user_access',
-        'access arguments' => array('edit', 1),
+        'access arguments' => array('edit', 3),
       ),
     );
   }
@@ -60,6 +60,12 @@ function inline_documentation_entity_info() {
       'label' => 'name',
     ),
     'fieldable' => FALSE,
+    'view modes' => array(
+      'inline_documentation' => array(
+        'label' => t('Inline documentation'),
+        'custom settings' => FALSE,
+      ),
+    ),
     'access callback' => 'inline_documentation_entity_access',
     'module' => 'inline_documentation',
   );
@@ -161,7 +167,13 @@ function inline_documentation_preprocess_page(&$variables) {
       $paths[] = $menu_item['href'];
     }
     if ($inline_documentation = inline_documentation_load_by_path($paths)) {
-      // @TODO: do something.
+      $docs = array();
+      foreach ($inline_documentation as $inline_doc) {
+        $docs[] = inline_documentation_load($inline_doc->did);
+      }
+
+      $inline_doc_view = entity_view('inline_documentation', $docs);
+      $variables['page']['content']['inline_documentation'] = $inline_doc_view['inline_documentation'];
     }
   }
 }
@@ -176,7 +188,7 @@ function inline_documentation_entity_view($entity, $type, $view_mode, $langcode)
     $inline_documentation = inline_documentation_embed_inline_documentation($entity->did, $langcode);
     // Remove the name from the inline_documentation which will be provided by
     // the entity view logic.
-    unset($inline_documentation['name']);
+    //unset($inline_documentation['name']);
     // Assign the inline_documentation to the entity.
     $entity->content = $inline_documentation;
   }
@@ -411,6 +423,21 @@ function inline_documentation_theme() {
       'render element' => 'form',
       'file' => 'inline_documentation.theme.inc',
     ),
+    'inline_documentation' => array(
+      'template' => 'theme/inline_documentation',
+      'variables' => array(
+        'hash' => NULL,
+        'name' => NULL,
+        'description' => NULL,
+        'items' => NULL,
+      ),
+    ),
+    'inline_documentation_item' => array(
+      'template' => 'theme/inline_documentation_item',
+      'variables' => array(
+        'name' => NULL,
+      ),
+    ),
   );
 }
 
@@ -543,95 +570,55 @@ function inline_documentation_embed_inline_documentation($did, $langcode = NULL)
     // documentation bundles on one page.
     $inline_documentation_id = drupal_hash_base64(uniqid(mt_rand(), TRUE) . mt_rand());
 
-    // Construct the table data. This structure represents the table data layout
-    // for the TableData class.
-    $table_data = (object) array(
-      // Define the columns.
-      'cols' => array(
-        // This column contains the formatted name of the inline documentation
-        // item, the value for this column is the inline documentation item ID.
-        (object) array(
-          'id' => 'inline_documentation_item',
-          'label' => '',
-          'pattern' => '',
-          'type' => 'string',
-        ),
-        // This column contains the iid which links to the parent inline
-        // documentation item.
-        (object) array(
-          'id' => 'parent',
-          'label' => '',
-          'pattern' => '',
-          'type' => 'string',
-        ),
-      ),
-      // Initialize rows array. This will contain all the row data for the
-      // table.
-      'rows' => array(),
-    );
-    // Construct the inline documentation renderable array.
-    $inline_documentation_renderable_array = array(
-      '#prefix' => '<div class="inline_documentation inline_documentation-' . $did . '">',
-      '#suffix' => '</div>',
-      'name' => array('#markup' => '<h2>' . check_plain($inline_documentation->name) . '</h2>'),
-      'description_wrapper' => array(
-        '#type' => 'container',
-        '#attributes' => array('class' => 'description'),
-        'description' => array('#markup' => '<p>' . check_plain($inline_documentation->description) . '</p>'),
-      ),
-      'inline_documentation_items' => array(
-        '#type' => 'container',
-        '#attributes' => array('id' => "inline_documentation-items-{$inline_documentation_id}", 'class' => 'inline_documentation-items'),
-      ),
-    );
-    // Retrieve the inline documentation items by reference.
-    $inline_documentation_items_renderable_array = &$inline_documentation_renderable_array['inline_documentation_items'];
-
+    $inline_documentation_items = array();
     // Retrieve the inline documentation tree.
-    $inline_documentation_tree = inline_documentation_get_tree($did, 0, NULL, TRUE);
+    $inline_documentation_tree = inline_documentation_get_tree($did, TRUE);
     // Iterate through the inline documentation tree.
     foreach ($inline_documentation_tree as $tree_item) {
       // Construct inline documentation item ID.
       $inline_documentation_item_id = "{$inline_documentation_id}-{$tree_item->iid}";
+
       // Construct inline documentation item row and add it to the rows array.
-      $table_data->rows[] = (object) array(
-        'c' => array(
-          // Add the inline_documentation item ID prefixed with the inline_documentation ID and with
-          // the name as formatted value. The inline_documentation item name div is used
-          // to correctly identify the parent td.
-          (object) array('v' => $inline_documentation_item_id, 'f' => '<div id="inline_documentation-item-name-' . $inline_documentation_item_id . '" class="inline_documentation-item-name">' . check_plain($tree_item->name) . '</div>'),
-          // Add the parent inline_documentation item ID prefixed with the inline_documentation ID.
-          (object) array('v' => (empty($tree_item->parent) ? NULL : "{$inline_documentation_id}-{$tree_item->parent}")),
-        ),
-      );
-      // Render the inline_documentation item for non-javascript support.
+      //$variables['items'][$tree_item->iid] = entity_view('inline_documentation_item', array($tree_item), 'inline_documentation', $langcode);
+      //$variables['items'][$tree_item->iid]['hash'] = $inline_documentation_item_id;
+
+      // Render the inline_documentation item.
+      $tree_item->hash = $inline_documentation_item_id;
       $inline_documentation_item_view = entity_view('inline_documentation_item', array($tree_item), 'inline_documentation', $langcode);
+
       // Retrieve the inline_documentation item view.
       $inline_documentation_item_view = $inline_documentation_item_view['inline_documentation_item'][$tree_item->iid];
-      // Add wrapper div needed to locate the content for the BeautyTips.
-      $inline_documentation_item_view['#prefix'] = '<div id="inline_documentation-item-wrapper-' . $inline_documentation_item_id . '" class="inline_documentation-item-wrapper">';
-      $inline_documentation_item_view['#suffix'] = '</div>';
+
       // Add the rendered inline_documentation item to the inline_documentation items render array.
-      $inline_documentation_items_renderable_array[$tree_item->iid] = $inline_documentation_item_view;
+      $inline_documentation_items[$tree_item->iid] = render($inline_documentation_item_view);
     }
-/*
-    // Only add javascript if the inline_documentation contains inline_documentation items.
-    if (!empty($inline_documentation_tree)) {
-      // Include the Google API JavaScript.
-      drupal_add_js('https://www.google.com/jsapi', array('type' => 'external', 'group' => JS_LIBRARY));
-      // Add the jQuery BeautyTips plugin.
-      drupal_add_library('inline_documentation', 'jquery.beautytips');
-      // Include the inline_documentation content loader.
-      drupal_add_js(drupal_get_path('module', 'inline_documentation') . '/inline_documentation.js');
-      // Encode the inline_documentation table data add the inline_documentation to the inline_documentations
-      // list.
-      drupal_add_js(array('inline_documentation' => array('inline_documentations' => array($inline_documentation_id => drupal_json_encode($table_data)))), 'setting');
-      // Add close button image url.
-      drupal_add_js(array('inline_documentation' => array('images' => array('close_button' => url(drupal_get_path('module', 'inline_documentation') . '/images/close.png')))), 'setting');
-      // Add CSS style for the inline_documentation BeautyTips (only affects the close
-      // button).
-      drupal_add_css(drupal_get_path('module', 'inline_documentation') . '/inline_documentation.css');
-    }*/
+
+    $inline_documentation_renderable_array = array(
+      '#theme'       => 'inline_documentation',
+      '#hash'        => $inline_documentation_id,
+      '#name'        => check_plain($inline_documentation->name),
+      '#description' => nl2br(check_plain($inline_documentation->description)),
+      '#items'       => $inline_documentation_items,
+    );
+
+    /*
+        // Only add javascript if the inline_documentation contains inline_documentation items.
+        if (!empty($inline_documentation_tree)) {
+          // Include the Google API JavaScript.
+          drupal_add_js('https://www.google.com/jsapi', array('type' => 'external', 'group' => JS_LIBRARY));
+          // Add the jQuery BeautyTips plugin.
+          drupal_add_library('inline_documentation', 'jquery.beautytips');
+          // Include the inline_documentation content loader.
+          drupal_add_js(drupal_get_path('module', 'inline_documentation') . '/inline_documentation.js');
+          // Encode the inline_documentation table data add the inline_documentation to the inline_documentations
+          // list.
+          drupal_add_js(array('inline_documentation' => array('inline_documentations' => array($inline_documentation_id => drupal_json_encode($table_data)))), 'setting');
+          // Add close button image url.
+          drupal_add_js(array('inline_documentation' => array('images' => array('close_button' => url(drupal_get_path('module', 'inline_documentation') . '/images/close.png')))), 'setting');
+          // Add CSS style for the inline_documentation BeautyTips (only affects the close
+          // button).
+          drupal_add_css(drupal_get_path('module', 'inline_documentation') . '/inline_documentation.css');
+        }*/
   }
   // Return the inline documentation renderable array.
   return $inline_documentation_renderable_array;
@@ -713,7 +700,7 @@ function inline_documentation_get_tree($did, $load_entities = FALSE) {
   foreach ($inline_documentation_items[$did] as $item) {
     // Retrieve the inline documentation item. This can be an queried entity or
     // a fully loaded entity depending on the load_entities value.
-    $inline_documentation_item = ($load_entities ? $inline_documentation_items_entities[$did][$item->iid] : $item);
+    $inline_documentation_item = ($load_entities ? $inline_documentation_items_entities[$item->iid] : $item);
     // Add the item to the tree.
     $tree[] = $inline_documentation_item;
   }
@@ -754,7 +741,21 @@ function inline_documentation_get_item_by_name($name) {
   return inline_documentation_item_load_multiple(FALSE, array('name' => trim($name)));
 }
 
-function inline_documentation_load_by_path($paths) {
+/**
+ * Helper function to load all inline documentation IDs by one or multiple
+ * paths.
+ *
+ * @param array $paths
+ *    Array containing paths.
+ *
+ * @return array
+ *    Array with matching entity IDs.
+ */
+function inline_documentation_load_by_path($paths = array()) {
+  if (empty($paths)) {
+    return array();
+  }
+
   // Create the where array with placeholders.
   $where = array();
   $where_tokens = array();

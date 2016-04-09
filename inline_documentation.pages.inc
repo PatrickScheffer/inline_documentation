@@ -17,7 +17,7 @@
  * </ul>
  */
 function inline_documentation_redirect_to_inline_documentation_item_overview($inline_documentation_machine_name) {
-  drupal_goto("inline_documentation/{$inline_documentation_machine_name}");
+  drupal_goto("admin/structure/inline_documentation/{$inline_documentation_machine_name}");
 }
 
 /*
@@ -26,7 +26,7 @@ function inline_documentation_redirect_to_inline_documentation_item_overview($in
 
 /**
  * Form generator function for the page
- * 'inline_documentation/%inline_documentation_machine_name'.
+ * 'admin/structure/inline_documentation/%inline_documentation_machine_name'.
  */
 function inline_documentation_form_overview_inline_documentation_items($form, &$form_state, $inline_documentation) {
   $form['#inline_documentation'] = $inline_documentation;
@@ -206,7 +206,7 @@ function inline_documentation_form_inline_documentation_item($form, &$form_state
  *
  * Used by the following menu items:
  * <ul>
- *   <li>inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item/delete</li>
+ *   <li>admin/structure/inline_documentation/%inline_documentation_machine_name/item/%inline_documentation_item/delete</li>
  * </ul>
  */
 function inline_documentation_form_confirm_delete_inline_documentation_item($form, &$form_state, $inline_documentation_item) {
